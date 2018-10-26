@@ -14,6 +14,8 @@ from cv_bridge import CvBridge
 #############
 # CONSTANTS #
 #############
+# If src is an int, the it is presumed to be the index of the wevcam/USB camera on the system. If src is a str, then
+# it is assumed to to be the path to a video file
 SRC = 0
 
 
@@ -21,72 +23,88 @@ SRC = 0
 # CAMERA #
 ##########
 class Camera:
-	def __init__(self, src=0):
-		# initialize the video camera steam and read the first frame from the stream
-		# if src is an int, the it is presumed to be the index of the wevcam/USB camera on the system. If src is a str, then
-		# it is assumed to to be the path to a video file
-		self.camera = cv2.VideoCapture(src)
-		self.grabbed, self.image = self.camera.read()
+    def __init__(self):
+        # Initiallize ROS node 'camera'
+        rospy.init_node('camera')
+        
+        # Initialize the video camera steam and read the first frame from the stream
+        self.camera = cv2.VideoCapture(SRC)
 
-		# initiallize the variable used to indicate if the thread should be stopped
-		self.stopped = False
+        # Initiallize the variable used to indicate if the thread should be stopped
+        self.stopped = False
 
-	def start(self):
-		# start the thread to read frames from the video stream
-		Thread(target=self.update).start()
+        # initiallize publisher to publish images from camera
+        self.image_pub = rospy.Publisher('/image', Image, queue_size=1)
 
-	def update(self):
-		# keep looping infinitely until the thread is stopped
-		while True:
-			# if the thread indicator variable is set, stop the thread
-			if self.stopped:
-				return
+        # Initiallize instance of CvBridge
+        self.bridge = CvBridge()
 
-			# otherwise, read the next frame from the stream
-			self.grabbed, self.image = self.camera.read()
+        # Initallize FPS counter to keep track of the frame rate
+        self.fps = fps.FPS()
 
-	def read(self):
-		# return the frame most recently read
-		return self.image
+    #############
+    # STREAMING #
+    #############
+    def start(self):
+        """
+        Start thread to detect balls.
+        """
+        # Start thread to continually publish the video stream over the topic '/image'
+        Thread(target=self.stream).start()
+        
+        # Start timer to track frame rate
+        self.fps.start()
+        # Disply info
+        print('[INFO] camera on...')
 
-	def stop(self):
-		# indicate that the thread should be stopped
-		self.stopped = True
+
+    def stop(self):
+        """
+        Stop streaming thread.
+        """
+        # Stop thread
+        self.stopped = True
+
+        # Stop FPS counter
+        self.fps.stop()
+        # Disply frame rate info
+        print('[INFO] elasped time: {:.2f}'.format(self.fps.elapsed()))
+        print('[INFO] approx. FPS: {:.2f}'.format(self.fps.fps()))
 
 
-# initiallize camera
-camera = Camera(SRC)
-# initiallize ROS node 'camera'
-rospy.init_node('camera')
-# initiallize publisher to publish images from camera
-image_pub = rospy.Publisher('/image', Image, queue_size=1)
-# initiallize instance of CvBridge
-bridge = CvBridge()
+    def stream(self):
+        """
+        Continually grabs the next image from the video stream and publish it as a ROS Image to the topic '/image'
+        """
+        # Keep looping infinitely until the thread is stopped
+        while True:
+            # If the thread indicator variable is set, stop the thread
+            if self.stopped:
+                return
 
-# start camera stream
-camera.start()
-# initallize FPS counter to keep track of the frame rate
-fps = fps.FPS()
-fps.start()
-# disply info
-print('[INFO] camera on...')
+            # Grab the next frame from the stream
+            grabbed, image = self.camera.read()
 
-while not rospy.is_shutdown():
-	# grab the frame from the threaded video stream
-	image = camera.read()
-	# convert image to a Image message
-	image_msg = bridge.cv2_to_imgmsg(image, 'bgr8')
-	# publish image
-	image_pub.publish(image_msg)
+            # Convert image to ROS message 
+            image_msg = self.bridge.cv2_to_imgmsg(image, 'bgr8')
+            # Publish image
+            self.image_pub.publish(image_msg)
 
-	# update FPS counter
-	fps.update()
+            # Update FPS counter
+            self.fps.update()
 
-# stop camera stream
-camera.stop()
-# stop FPS counter
-fps.stop()
-# display fame rate
-print('')
-print('[INFO] elasped time: {:.2f}'.format(fps.elapsed()))
-print('[INFO] approx. FPS: {:.2f}'.format(fps.fps()))
+
+            
+
+
+if __name__ == '__main__':
+    # Initiallize camera
+    camera = Camera()
+    # Start streaming images
+    camera.start()
+
+    # spin() simply keeps python from exiting unil this node is stopped
+    rospy.spin()
+
+    # Stop streaming images
+    camera.stop()
