@@ -19,8 +19,8 @@ from cv_bridge import CvBridge
 SRC = 1
 
 # HSV green bounds
-GREEN_LOWER = np.array([26, 86, 70])
-GREEN_UPPER = np.array([64, 255, 255])
+GREEN_LOWER = np.array([.11, .6, .2]) * 255
+GREEN_UPPER = np.array([.25, 1, 1]) * 255
 
 # hough circles parameters
 METHOD = cv2.HOUGH_GRADIENT # defines the method to detect circles in images (only one option currently available)
