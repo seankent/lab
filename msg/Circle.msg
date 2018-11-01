@@ -1,3 +1,3 @@
-uint32 x
-uint32 y
+uint32 px
+uint32 py
 uint32 radius

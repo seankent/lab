@@ -18,6 +18,9 @@ from cv_bridge import CvBridge
 # it is assumed to to be the path to a video file
 SRC = 0
 
+# Highest number the image id can reach
+MAX_ID = 2**32
+
 
 ##########
 # CAMERA #
@@ -41,6 +44,8 @@ class Camera:
 
         # Initallize FPS counter to keep track of the frame rate
         self.fps = fps.FPS()
+
+        self.id = 0
 
     #############
     # STREAMING #
@@ -87,8 +92,14 @@ class Camera:
 
             # Convert image to ROS message 
             image_msg = self.bridge.cv2_to_imgmsg(image, 'bgr8')
+            # Set image_msg id
+            image_msg.header.seq = self.id
+
             # Publish image
             self.image_pub.publish(image_msg)
+            
+            # Increment id number (wrap it if it exceeds MAX_ID)
+            self.id += 1; self.id %= MAX_ID
 
             # Update FPS counter
             self.fps.update()
